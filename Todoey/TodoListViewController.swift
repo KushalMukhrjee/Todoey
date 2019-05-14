@@ -71,6 +71,10 @@ self.itemArray.append(alertTextField.text!)
             }
         }
         
+        let cancel = UIAlertAction(title: "Cancel", style: .cancel, handler: nil)
+        
+        alertVC.addAction(cancel)
+        
         alertVC.addAction(add)
         present(alertVC, animated: true, completion: nil)
         
