@@ -47,6 +47,36 @@ class TodoListViewController: UITableViewController {
         tableView.deselectRow(at: indexPath, animated: true) //flashes select momentarily and then goes away; looksgood in ui
     }
     
+    //MARK: - Add button
+    
+    @IBAction func addNewItem(_ sender: UIBarButtonItem) {
+        
+        var alertTextField=UITextField()
+        
+        let alertVC=UIAlertController(title: "New Item", message: nil, preferredStyle: .alert)
+        
+        alertVC.addTextField{
+            (textfield) in
+            textfield.placeholder="Create new item"
+            
+            alertTextField=textfield
+            
+        }
+        
+        let add = UIAlertAction(title: "Add", style: .default) { (action) in
+            
+            if(alertTextField.text != ""){
+self.itemArray.append(alertTextField.text!)
+            self.tableView.reloadData()
+            }
+        }
+        
+        alertVC.addAction(add)
+        present(alertVC, animated: true, completion: nil)
+        
+    }
+    
+    
 
 
 }
