@@ -8,8 +8,9 @@
 
 import Foundation
 
-class Item{
+class Item:Encodable,Decodable{
     
+    //encodable protocol: all properties of this class must have standard data types.
     var title : String
     var done : Bool = false
     

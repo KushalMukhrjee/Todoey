@@ -11,19 +11,15 @@ import UIKit
 class TodoListViewController: UITableViewController {
 
     var itemArray : [Item] = []
-    var defaults=UserDefaults.standard
+//    var defaults=UserDefaults.standard //to get userdefauts object
+    
+    var dataFilePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Items.plist") //i want to create my own plist file
+    
     override func viewDidLoad() {
+        
         super.viewDidLoad()
-        
-//        let item1=Item(title: "Find Mike")
-//        let item2=Item(title: "Kill demogorgon")
-        
-        
-        
-        if let items=defaults.value(forKey: "toDoListArray") as? [Item]{
-            itemArray=items
-        }
-        
+        print(dataFilePath!)
+        getItems()
         // Do any additional setup after loading the view.
     }
     
@@ -40,13 +36,13 @@ class TodoListViewController: UITableViewController {
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "todoitemcell", for: indexPath)
         cell.textLabel?.text=itemArray[indexPath.row].title
-        if(itemArray[indexPath.row].done == false){
-           
-            tableView.cellForRow(at: indexPath)?.accessoryType = .checkmark
+        if(itemArray[indexPath.row].done == true){
+            print("checkmark")
+            cell.accessoryType = .checkmark
         }
         else{
-          
-            tableView.cellForRow(at: indexPath)?.accessoryType = .none
+            print("none mark")
+            cell.accessoryType = .none
         }
         
         return cell
@@ -67,7 +63,8 @@ class TodoListViewController: UITableViewController {
             selectedItem.done=false
             tableView.cellForRow(at: indexPath)?.accessoryType = .none
         }
-        tableView.reloadData()
+        print("item array:",itemArray[indexPath.row].done)
+        saveItems()
         
         tableView.deselectRow(at: indexPath, animated: true) //flashes select momentarily and then goes away; looksgood in ui
     }
@@ -94,9 +91,8 @@ class TodoListViewController: UITableViewController {
                 
                 
                 self.itemArray.append(Item(title: alertTextField.text!))
-                self.defaults.set(self.itemArray, forKey: "toDoListArray")
+                self.saveItems()
                 
-                self.tableView.reloadData()
             }
         }
         
@@ -106,6 +102,45 @@ class TodoListViewController: UITableViewController {
         
         alertVC.addAction(add)
         present(alertVC, animated: true, completion: nil)
+        
+    }
+    
+    
+    func saveItems(){
+        
+        
+        let encoder=PropertyListEncoder() //this will help me in encoding my own objects into a form which can be written into a plist
+        
+        print("saved items...")
+        print(self.itemArray[0].done)
+        
+        
+        do{
+            let arr = try? encoder.encode(self.itemArray)
+            
+            try? arr?.write(to: self.dataFilePath!)
+        }
+        //self.defaults.set(arr, forKey: "toDoListArray") //will crash the code as you are setting custom object(non-property list object) to plist which is only meant for storing small amounts of data
+        
+        self.tableView.reloadData()
+        
+        
+    }
+    
+    
+    func getItems(){
+        
+        do{
+            let data = try Data(contentsOf: dataFilePath!)
+            let decoder=PropertyListDecoder()
+            itemArray = try decoder.decode([Item].self, from: data)
+            
+            print(itemArray[0].done)
+            
+        }
+        catch{
+            print("get items error : \(error)")
+        }
         
     }
     
