@@ -7,10 +7,18 @@
 //
 
 import UIKit
+import CoreData
 
-class TodoListViewController: UITableViewController {
-
+class TodoListViewController: UITableViewController{
+    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
     var itemArray : [Item] = []
+    
+    var selectedCategory:Category?{
+        didSet{
+            getItems()
+        }
+    }
+    
 //    var defaults=UserDefaults.standard //to get userdefauts object
     
     var dataFilePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Items.plist") //i want to create my own plist file
@@ -20,6 +28,8 @@ class TodoListViewController: UITableViewController {
         super.viewDidLoad()
         print(dataFilePath!)
         getItems()
+        
+        
         // Do any additional setup after loading the view.
     }
     
@@ -89,8 +99,14 @@ class TodoListViewController: UITableViewController {
             
             if(alertTextField.text != ""){
                 
+                let newItem=Item(context: self.context)
+                newItem.title = alertTextField.text
+                newItem.done = false
+                newItem.parentCategory=self.selectedCategory
                 
-                self.itemArray.append(Item(title: alertTextField.text!))
+                
+                
+                self.itemArray.append(newItem)
                 self.saveItems()
                 
             }
@@ -109,17 +125,26 @@ class TodoListViewController: UITableViewController {
     func saveItems(){
         
         
-        let encoder=PropertyListEncoder() //this will help me in encoding my own objects into a form which can be written into a plist
+//        let encoder=PropertyListEncoder() //this will help me in encoding my own objects into a form which can be written into a plist
         
         print("saved items...")
         print(self.itemArray[0].done)
         
         
         do{
-            let arr = try? encoder.encode(self.itemArray)
+//            let arr = try? encoder.encode(self.itemArray)
+//
+//            try? arr?.write(to: self.dataFilePath!)
             
-            try? arr?.write(to: self.dataFilePath!)
+            
+            try context.save()
+            
+            
         }
+        catch{
+            print("Error saving data:\(error)")
+        }
+        
         //self.defaults.set(arr, forKey: "toDoListArray") //will crash the code as you are setting custom object(non-property list object) to plist which is only meant for storing small amounts of data
         
         self.tableView.reloadData()
@@ -127,25 +152,88 @@ class TodoListViewController: UITableViewController {
         
     }
     
-    
-    func getItems(){
+
+    func getItems(with request:NSFetchRequest<Item> = Item.fetchRequest(),predicate:NSPredicate? = nil){
+        
+        let categoryPredicate=NSPredicate(format: "parentCategory.name MATCHES %@", self.selectedCategory!.name!)
+        
+        if let addedpredicate=predicate{
+            let compoundPredicate=NSCompoundPredicate(andPredicateWithSubpredicates: [categoryPredicate,addedpredicate])
+            request.predicate=compoundPredicate
+            
+        }
+        else{
+            request.predicate=categoryPredicate
+        }
+        
+
+//        do{
+//            let data = try Data(contentsOf: dataFilePath!)
+//            let decoder=PropertyListDecoder()
+//            itemArray = try decoder.decode([Item].self, from: data)
+//
+//            print(itemArray[0].done)
+//
+//        }
+//        catch{
+//            print("get items error : \(error)")
+//        }
+        
+        
         
         do{
-            let data = try Data(contentsOf: dataFilePath!)
-            let decoder=PropertyListDecoder()
-            itemArray = try decoder.decode([Item].self, from: data)
-            
-            print(itemArray[0].done)
+            self.itemArray = try context.fetch(request)
             
         }
         catch{
-            print("get items error : \(error)")
+            print("error while fetching from context: \(error)")
         }
-        
+        tableView.reloadData()
+
     }
+    
+    
+    
+    
     
     
 
 
 }
 
+extension TodoListViewController:UISearchBarDelegate{
+    
+    func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
+        let request : NSFetchRequest<Item> = Item.fetchRequest()
+        
+        let predicate = NSPredicate(format: "title CONTAINS[cd] %@", searchBar.text!)
+        request.predicate=predicate
+        
+        let sortDescriptor = NSSortDescriptor(key: "title", ascending: true)
+        request.sortDescriptors=[sortDescriptor]
+        
+        getItems(with: request)
+    }
+    
+    func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
+        if(searchBar.text==""){
+            getItems()
+            DispatchQueue.main.async {
+            searchBar.resignFirstResponder()
+            }
+            
+        }
+        else{
+              let request : NSFetchRequest<Item> = Item.fetchRequest()
+            let predicate = NSPredicate(format: "title CONTAINS[cd] %@", searchBar.text!)
+            
+            
+            let sortDescriptor = NSSortDescriptor(key: "title", ascending: true)
+            request.sortDescriptors=[sortDescriptor]
+            
+            getItems(with: request,predicate: predicate)
+        }
+    }
+    
+    
+}
