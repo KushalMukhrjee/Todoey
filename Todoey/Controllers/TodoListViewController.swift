@@ -8,12 +8,16 @@
 
 import UIKit
 import CoreData
+import RealmSwift
 
 class TodoListViewController: UITableViewController{
-    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
-    var itemArray : [Item] = []
+//    let context = (UIApplication.shared.delegate as! AppDelegate).persistentContainer.viewContext
+//    var itemArray : [ItemR] = []
+    var itemArray : Results<ItemR>?
     
-    var selectedCategory:Category?{
+    let realm=try! Realm()
+    
+    var selectedCategory:CategoryR?{
         didSet{
             getItems()
         }
@@ -21,13 +25,15 @@ class TodoListViewController: UITableViewController{
     
 //    var defaults=UserDefaults.standard //to get userdefauts object
     
-    var dataFilePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Items.plist") //i want to create my own plist file
+//    var dataFilePath = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first?.appendingPathComponent("Items.plist") //i want to create my own plist file
     
     override func viewDidLoad() {
         
         super.viewDidLoad()
-        print(dataFilePath!)
+//        print(dataFilePath!)
         getItems()
+
+        
         
         
         // Do any additional setup after loading the view.
@@ -40,18 +46,25 @@ class TodoListViewController: UITableViewController{
     }
     
     override func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return itemArray.count
+        return itemArray?.count ?? 1
     }
     
     override func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "todoitemcell", for: indexPath)
-        cell.textLabel?.text=itemArray[indexPath.row].title
-        if(itemArray[indexPath.row].done == true){
+        
+        if let item = itemArray?[indexPath.row]{
+            cell.textLabel?.text=item.title
+            if(item.done == true){
             print("checkmark")
             cell.accessoryType = .checkmark
+            }
+            else{
+            print("none mark")
+            cell.accessoryType = .none
+            }
         }
         else{
-            print("none mark")
+            cell.textLabel?.text="No items added yet."
             cell.accessoryType = .none
         }
         
@@ -62,21 +75,34 @@ class TodoListViewController: UITableViewController{
     //MARK: - Tableview delegate methods
     
     override func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
+        if let item = itemArray?[indexPath.row]{
+            do{
+            try realm.write {
+                item.done = !item.done
+            }
+            }
+            catch{
+                print("Error changing done value :\(error)")
+            }
+        }
         
-        let selectedItem=itemArray[indexPath.row]
-
-        if(selectedItem.done == false){
-            selectedItem.done=true
-            tableView.cellForRow(at: indexPath)?.accessoryType = .checkmark
-        }
-        else{
-            selectedItem.done=false
-            tableView.cellForRow(at: indexPath)?.accessoryType = .none
-        }
-        print("item array:",itemArray[indexPath.row].done)
-        saveItems()
+        
+//        let selectedItem=itemArray[indexPath.row]
+//
+//        if(selectedItem.done == false){
+//            selectedItem.done=true
+//            tableView.cellForRow(at: indexPath)?.accessoryType = .checkmark
+//        }
+//        else{
+//            selectedItem.done=false
+//            tableView.cellForRow(at: indexPath)?.accessoryType = .none
+//        }
+//        print("item array:",itemArray[indexPath.row].done)
+//        saveItems()
         
         tableView.deselectRow(at: indexPath, animated: true) //flashes select momentarily and then goes away; looksgood in ui
+        
+        tableView.reloadData()
     }
     
     //MARK: - Add button
@@ -99,15 +125,28 @@ class TodoListViewController: UITableViewController{
             
             if(alertTextField.text != ""){
                 
-                let newItem=Item(context: self.context)
-                newItem.title = alertTextField.text
-                newItem.done = false
-                newItem.parentCategory=self.selectedCategory
+//                let newItem=Item(context: self.context)
+                do{
+                    try self.realm.write {
+                    let newItem=ItemR()
+                    newItem.title = alertTextField.text!
+                    newItem.done = false
+                    self.selectedCategory?.items.append(newItem)
+                    
+                }
+                }
+                catch{
+                    print("Error adding new item \(error)")
+                }
+                
+                self.tableView.reloadData()
                 
                 
                 
-                self.itemArray.append(newItem)
-                self.saveItems()
+                
+                
+//                self.itemArray.append(newItem) //auto updating container
+//                self.saveItems() 
                 
             }
         }
@@ -122,76 +161,83 @@ class TodoListViewController: UITableViewController{
     }
     
     
-    func saveItems(){
-        
-        
-//        let encoder=PropertyListEncoder() //this will help me in encoding my own objects into a form which can be written into a plist
-        
-        print("saved items...")
-        print(self.itemArray[0].done)
-        
-        
-        do{
-//            let arr = try? encoder.encode(self.itemArray)
+//    func saveItems(){
 //
-//            try? arr?.write(to: self.dataFilePath!)
-            
-            
-            try context.save()
-            
-            
-        }
-        catch{
-            print("Error saving data:\(error)")
-        }
-        
-        //self.defaults.set(arr, forKey: "toDoListArray") //will crash the code as you are setting custom object(non-property list object) to plist which is only meant for storing small amounts of data
-        
-        self.tableView.reloadData()
-        
-        
-    }
-    
-
-    func getItems(with request:NSFetchRequest<Item> = Item.fetchRequest(),predicate:NSPredicate? = nil){
-        
-        let categoryPredicate=NSPredicate(format: "parentCategory.name MATCHES %@", self.selectedCategory!.name!)
-        
-        if let addedpredicate=predicate{
-            let compoundPredicate=NSCompoundPredicate(andPredicateWithSubpredicates: [categoryPredicate,addedpredicate])
-            request.predicate=compoundPredicate
-            
-        }
-        else{
-            request.predicate=categoryPredicate
-        }
-        
-
+//
+////        let encoder=PropertyListEncoder() //this will help me in encoding my own objects into a form which can be written into a plist
+//
+//        print("saved items...")
+//        print(self.itemArray[0].done)
+//
+//
 //        do{
-//            let data = try Data(contentsOf: dataFilePath!)
-//            let decoder=PropertyListDecoder()
-//            itemArray = try decoder.decode([Item].self, from: data)
+////            let arr = try? encoder.encode(self.itemArray)
+////
+////            try? arr?.write(to: self.dataFilePath!)
 //
-//            print(itemArray[0].done)
+//
+//            try context.save()
+//
 //
 //        }
 //        catch{
-//            print("get items error : \(error)")
+//            print("Error saving data:\(error)")
 //        }
-        
-        
-        
-        do{
-            self.itemArray = try context.fetch(request)
-            
-        }
-        catch{
-            print("error while fetching from context: \(error)")
-        }
-        tableView.reloadData()
-
-    }
+//
+//        //self.defaults.set(arr, forKey: "toDoListArray") //will crash the code as you are setting custom object(non-property list object) to plist which is only meant for storing small amounts of data
+//
+//        self.tableView.reloadData()
+//
+//
+//    }
     
+
+//    func getItems(with request:NSFetchRequest<Item> = Item.fetchRequest(),predicate:NSPredicate? = nil){
+//
+//        let categoryPredicate=NSPredicate(format: "parentCategory.name MATCHES %@", self.selectedCategory!.name!)
+//
+//        if let addedpredicate=predicate{
+//            let compoundPredicate=NSCompoundPredicate(andPredicateWithSubpredicates: [categoryPredicate,addedpredicate])
+//            request.predicate=compoundPredicate
+//
+//        }
+//        else{
+//            request.predicate=categoryPredicate
+//        }
+//
+//
+////        do{
+////            let data = try Data(contentsOf: dataFilePath!)
+////            let decoder=PropertyListDecoder()
+////            itemArray = try decoder.decode([Item].self, from: data)
+////
+////            print(itemArray[0].done)
+////
+////        }
+////        catch{
+////            print("get items error : \(error)")
+////        }
+//
+//
+//
+//        do{
+//            self.itemArray = try context.fetch(request)
+//
+//        }
+//        catch{
+//            print("error while fetching from context: \(error)")
+//        }
+//        tableView.reloadData()
+//
+//    }
+    
+    func getItems(){
+        
+        itemArray = selectedCategory?.items.sorted(byKeyPath: "title", ascending:true)
+        
+        tableView.reloadData()
+        
+    }
     
     
     
@@ -202,38 +248,42 @@ class TodoListViewController: UITableViewController{
 }
 
 extension TodoListViewController:UISearchBarDelegate{
-    
+
     func searchBarSearchButtonClicked(_ searchBar: UISearchBar) {
-        let request : NSFetchRequest<Item> = Item.fetchRequest()
-        
-        let predicate = NSPredicate(format: "title CONTAINS[cd] %@", searchBar.text!)
-        request.predicate=predicate
-        
-        let sortDescriptor = NSSortDescriptor(key: "title", ascending: true)
-        request.sortDescriptors=[sortDescriptor]
-        
-        getItems(with: request)
+//        let request : NSFetchRequest<Item> = Item.fetchRequest()
+//
+//        let predicate = NSPredicate(format: "title CONTAINS[cd] %@", searchBar.text!)
+//        request.predicate=predicate
+//
+//        let sortDescriptor = NSSortDescriptor(key: "title", ascending: true)
+//        request.sortDescriptors=[sortDescriptor]
+//
+//        getItems(with: request)
+        print("search bar clicked")
+        itemArray=itemArray?.filter("title CONTAINS[cd] %@", searchBar.text!).sorted(byKeyPath: "dateCreated", ascending: true)
+        tableView.reloadData()
     }
-    
+
     func searchBar(_ searchBar: UISearchBar, textDidChange searchText: String) {
         if(searchBar.text==""){
             getItems()
             DispatchQueue.main.async {
             searchBar.resignFirstResponder()
             }
-            
+
         }
         else{
-              let request : NSFetchRequest<Item> = Item.fetchRequest()
-            let predicate = NSPredicate(format: "title CONTAINS[cd] %@", searchBar.text!)
+//              let request : NSFetchRequest<Item> = Item.fetchRequest()
+//            let predicate = NSPredicate(format: "title CONTAINS[cd] %@", searchBar.text!)
+//
+//
+//            let sortDescriptor = NSSortDescriptor(key: "title", ascending: true)
+//            request.sortDescriptors=[sortDescriptor]
+
+//            getItems()
             
-            
-            let sortDescriptor = NSSortDescriptor(key: "title", ascending: true)
-            request.sortDescriptors=[sortDescriptor]
-            
-            getItems(with: request,predicate: predicate)
         }
     }
-    
-    
+
+
 }
